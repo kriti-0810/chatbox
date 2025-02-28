@@ -7,7 +7,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.0/socket.io.js"></script>
     <style>
         body { font-family: Arial, sans-serif; text-align: center; }
-        #chat-box { width: 80%; height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin: auto; text-align: left; }
+        #chat-box { width: 80%; height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin: auto; text-align: left; display: flex; flex-direction: column; }
+        .message { max-width: 60%; padding: 10px; margin: 5px; border-radius: 10px; }
+        .sent { background-color: #007bff; color: white; align-self: flex-end; }
+        .received { background-color: #e0e0e0; color: black; align-self: flex-start; }
         input { width: 70%; padding: 8px; }
         button { padding: 8px; }
     </style>
@@ -29,32 +32,89 @@
 
     <h3>Available Files</h3>
     <ul id="file-list"></ul>
-
+    <div id="username-notification" style="
+        display: none;
+        position: fixed;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: green;
+        color: white;
+        padding: 10px 20px;
+        border-radius: 5px;
+        font-weight: bold;
+        z-index: 1000;
+    ">Username set successfully</div>
     <script>
         var socket = io(window.location.origin);
-
         var username = "";
 
         function setUsername() {
-            username = document.getElementById("username").value;
-            if (username.trim() === "") {
-                alert("Please enter a valid username.");
+            if (username){
+                alert("You have already set your username.");
+                return;
             }
+            username = document.getElementById("username").value.trim();
+            if (username === "") {
+                alert("Please enter a valid username.");
+                return;
+            }
+            document.getElementById("username").value = "";
+            document.getElementById("username").disabled = true; // Disable username change
+            document.querySelector("button[onclick='setUsername()']").disabled = true;
+            
+            let notification = document.getElementById("username-notification");
+            notification.style.display = "block";
+            setTimeout(() => {
+                notification.style.display = "none";
+            }, 2000);
         }
+
+        function sendMessage() {
+            var message = document.getElementById("message").value.trim();
+            if (username === "") {
+                alert("Please set your username first.");
+                return;
+            }
+            if (message === "") return;
+
+            socket.emit("message", { username: username, message: message });
+            addMessage(username, message, true);
+            document.getElementById("message").value = "";
+        }
+
+        document.getElementById("username").addEventListener("keypress", function(event) {
+            if (event.key === "Enter") {
+                setUsername();
+            }
+        });
+
+        document.getElementById("message").addEventListener("keypress", function(event) {
+            if (event.key === "Enter") {
+                sendMessage();
+            }
+        });
 
         socket.on("connect", function() {
             console.log("Connected to server.");
         });
 
-        
         socket.on("message", function(data) {
-            console.log("Received message:", data); // Debugging
-            let messageBox = document.getElementById("chat-box"); 
-            let newMessage = document.createElement("p");
-            newMessage.textContent = `${data.username}: ${data.message}`;
-            messageBox.appendChild(newMessage);
+            if (data.username !==username){
+                addMessage(data.username, data.message, false);
+            }
+            
         });
 
+        function addMessage(sender, msg, isSentByMe) {
+            let messageBox = document.getElementById("chat-box"); 
+            let newMessage = document.createElement("p");
+            newMessage.classList.add("message");
+            newMessage.classList.add(isSentByMe ? "sent" : "received");
+            newMessage.textContent = `${sender}: ${msg}`;
+            messageBox.appendChild(newMessage);
+            messageBox.scrollTop = messageBox.scrollHeight;
+        }
 
         socket.on("file_uploaded", function(filename) {
             var fileList = document.getElementById("file-list");
@@ -62,17 +122,6 @@
             fileItem.innerHTML = `<a href="/files/${filename}" target="_blank">${filename}</a>`;
             fileList.appendChild(fileItem);
         });
-
-        function sendMessage() {
-            var message = document.getElementById("message").value;
-            if (username.trim() === "") {
-                alert("Please set your username first.");
-                return;
-            }
-            socket.emit("message", { username: username, message: message });
-
-            document.getElementById("message").value = "";
-        }
 
         function uploadFile() {
             var fileInput = document.getElementById("fileInput");
