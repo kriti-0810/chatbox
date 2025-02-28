@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Chat</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.0/socket.io.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; }
+        #chat-box { width: 80%; height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin: auto; text-align: left; }
+        input { width: 70%; padding: 8px; }
+        button { padding: 8px; }
+    </style>
+</head>
+<body>
+    <h2>Web Chat</h2>
+    <input type="text" id="username" placeholder="Enter your name" required>
+    <button onclick="setUsername()">Set Name</button>
+    <br><br>
+    
+    <div id="chat-box"></div>
+    
+    <input type="text" id="message" placeholder="Type a message...">
+    <button onclick="sendMessage()">Send</button>
+
+    <h3>Upload File</h3>
+    <input type="file" id="fileInput">
+    <button onclick="uploadFile()">Upload</button>
+
+    <h3>Available Files</h3>
+    <ul id="file-list"></ul>
+
+    <script>
+        var socket = io(window.location.origin);
+
+        var username = "";
+
+        function setUsername() {
+            username = document.getElementById("username").value;
+            if (username.trim() === "") {
+                alert("Please enter a valid username.");
+            }
+        }
+
+        socket.on("connect", function() {
+            console.log("Connected to server.");
+        });
+
+        
+        socket.on("message", function(data) {
+            console.log("Received message:", data); // Debugging
+            let messageBox = document.getElementById("chat-box"); 
+            let newMessage = document.createElement("p");
+            newMessage.textContent = `${data.username}: ${data.message}`;
+            messageBox.appendChild(newMessage);
+        });
+
+
+        socket.on("file_uploaded", function(filename) {
+            var fileList = document.getElementById("file-list");
+            var fileItem = document.createElement("li");
+            fileItem.innerHTML = `<a href="/files/${filename}" target="_blank">${filename}</a>`;
+            fileList.appendChild(fileItem);
+        });
+
+        function sendMessage() {
+            var message = document.getElementById("message").value;
+            if (username.trim() === "") {
+                alert("Please set your username first.");
+                return;
+            }
+            socket.emit("message", { username: username, message: message });
+
+            document.getElementById("message").value = "";
+        }
+
+        function uploadFile() {
+            var fileInput = document.getElementById("fileInput");
+            var file = fileInput.files[0];
+
+            if (!file) {
+                alert("Please select a file to upload.");
+                return;
+            }
+
+            var formData = new FormData();
+            formData.append("file", file);
+
+            fetch("/upload", {
+                method: "POST",
+                body: formData
+            }).then(response => response.text())
+            .then(data => {
+                alert(data);
+                fileInput.value = "";  
+            }).catch(error => {
+                console.error("Error:", error);
+            });
+        }
+    </script>
+</body>
+</html>
